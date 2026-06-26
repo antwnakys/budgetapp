@@ -1,0 +1,26 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="QuickBudget logo">
+  <defs>
+    <linearGradient id="qb-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#222a4d"/>
+      <stop offset="1" stop-color="#151933"/>
+    </linearGradient>
+    <filter id="qb-shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="1.2" stdDeviation="1.2" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- App-icon rounded square -->
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#qb-bg)" stroke="#2b3355" stroke-width="1.5"/>
+
+  <!-- Doughnut ring: four colored segments (circumference ≈ 113.1) -->
+  <g fill="none" stroke-width="8" stroke-linecap="round">
+    <circle cx="32" cy="32" r="18" stroke="#6c8cff" stroke-dasharray="32 81.1" transform="rotate(-90 32 32)"/>
+    <circle cx="32" cy="32" r="18" stroke="#36d399" stroke-dasharray="27 86.1" transform="rotate(16 32 32)"/>
+    <circle cx="32" cy="32" r="18" stroke="#ffb454" stroke-dasharray="27 86.1" transform="rotate(105 32 32)"/>
+    <circle cx="32" cy="32" r="18" stroke="#f472b6" stroke-dasharray="21 92.1" transform="rotate(194 32 32)"/>
+  </g>
+
+  <!-- Lightning bolt = "quick" -->
+  <path d="M35.5 16 L23 35.5 H31 L28.5 48 L42 28 H34 Z"
+        fill="#ffffff" filter="url(#qb-shadow)"/>
+</svg>

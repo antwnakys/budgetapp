@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Budget Circle — Track your money</title>
+  <title>QuickBudget — Track your money by the day</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,28 +17,17 @@
   <!-- ============ SIGN IN VIEW ============ -->
   <section id="auth-view" class="view">
     <div class="card auth-card">
-      <div class="logo">💰</div>
-      <h1>Budget Circle</h1>
-      <p class="subtitle">See where your money goes — at a glance.</p>
+      <img src="logo.svg" alt="QuickBudget" class="auth-logo" />
+      <h1>QuickBudget</h1>
+      <p class="subtitle">Track your money, day by day.</p>
 
       <form id="auth-form">
         <label for="email">Email</label>
-        <input
-          type="email"
-          id="email"
-          placeholder="you@example.com"
-          autocomplete="email"
-          required
-        />
+        <input type="email" id="email" placeholder="you@example.com"
+               autocomplete="email" required />
         <label for="password">Password</label>
-        <input
-          type="password"
-          id="password"
-          placeholder="••••••••"
-          autocomplete="current-password"
-          minlength="6"
-          required
-        />
+        <input type="password" id="password" placeholder="••••••••"
+               autocomplete="current-password" minlength="6" required />
 
         <button type="submit" id="signin-btn" class="btn primary">Sign in</button>
         <button type="button" id="signup-btn" class="btn ghost">Create account</button>
@@ -46,16 +36,22 @@
       </form>
 
       <p class="fineprint">
-        Your account and budget are stored securely in the cloud (Supabase) and
-        sync across devices.
+        Your account and budget sync securely across devices.
       </p>
     </div>
   </section>
 
-  <!-- ============ DASHBOARD VIEW ============ -->
+  <!-- ============ APP VIEW ============ -->
   <section id="app-view" class="view" hidden>
     <header class="topbar">
-      <div class="brand">💰 Budget Circle</div>
+      <div class="brand">
+        <img src="logo.svg" alt="" class="brand-logo" />
+        <span>QuickBudget</span>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="calendar">Calendar</button>
+      </nav>
       <div class="user-box">
         <span id="user-email"></span>
         <button id="signout-btn" class="btn ghost small">Sign out</button>
@@ -63,101 +59,134 @@
     </header>
 
     <main class="dashboard">
-      <!-- Summary cards -->
-      <div class="summary">
-        <div class="stat">
-          <span class="stat-label">Income</span>
-          <span class="stat-value" id="stat-income">$0</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Spent</span>
-          <span class="stat-value" id="stat-spent">$0</span>
-        </div>
-        <div class="stat">
-          <span class="stat-label">Savings</span>
-          <span class="stat-value" id="stat-savings">$0</span>
-        </div>
-        <div class="stat highlight">
-          <span class="stat-label">Left over</span>
-          <span class="stat-value" id="stat-left">$0</span>
-        </div>
+      <!-- Shared month switcher -->
+      <div class="month-bar">
+        <button class="nav-btn" id="prev-month" aria-label="Previous month">‹</button>
+        <h2 id="month-label">Month</h2>
+        <button class="nav-btn" id="next-month" aria-label="Next month">›</button>
+        <button class="btn ghost small" id="today-btn">Today</button>
       </div>
 
-      <div class="grid">
-        <!-- LEFT: inputs -->
-        <div class="card">
-          <h2>Your money</h2>
-          <div class="field-row">
-            <label for="income-input">Monthly income</label>
-            <div class="money-input">
-              <span>$</span>
-              <input type="number" id="income-input" min="0" step="0.01" placeholder="0" />
-            </div>
+      <!-- ===== OVERVIEW TAB ===== -->
+      <div id="tab-overview" class="tab-panel">
+        <div class="summary">
+          <div class="stat">
+            <span class="stat-label">Income</span>
+            <span class="stat-value" id="stat-income">$0</span>
           </div>
-          <div class="field-row">
-            <label for="savings-input">Total savings</label>
-            <div class="money-input">
-              <span>$</span>
-              <input type="number" id="savings-input" min="0" step="0.01" placeholder="0" />
-            </div>
+          <div class="stat">
+            <span class="stat-label">Spent this month</span>
+            <span class="stat-value" id="stat-spent">$0</span>
           </div>
-          <p id="save-status" class="save-status">&nbsp;</p>
+          <div class="stat">
+            <span class="stat-label">Savings</span>
+            <span class="stat-value" id="stat-savings">$0</span>
+          </div>
+          <div class="stat highlight">
+            <span class="stat-label">Left over</span>
+            <span class="stat-value" id="stat-left">$0</span>
+          </div>
+        </div>
 
-          <hr />
-
-          <h2>Add an expense</h2>
-          <form id="expense-form" class="expense-form">
+        <div class="grid">
+          <div class="card">
+            <h3>Your money</h3>
             <div class="field-row">
-              <label for="category-select">Category</label>
-              <select id="category-select">
-                <option>Food &amp; Groceries</option>
-                <option>Rent &amp; Housing</option>
-                <option>Transport</option>
-                <option>Bills &amp; Utilities</option>
-                <option>Entertainment</option>
-                <option>Shopping</option>
-                <option>Health</option>
-                <option value="__custom__">Other / custom…</option>
-              </select>
-            </div>
-            <input
-              type="text"
-              id="custom-category"
-              placeholder="Custom category name"
-              hidden
-            />
-            <div class="field-row">
-              <label for="amount-input">Amount</label>
-              <div class="money-input">
-                <span>$</span>
-                <input type="number" id="amount-input" min="0" step="0.01" placeholder="0" required />
+              <label for="income-input">Monthly income</label>
+              <div class="money-input"><span>$</span>
+                <input type="number" id="income-input" min="0" step="0.01" placeholder="0" />
               </div>
             </div>
-            <button type="submit" class="btn primary">Add expense</button>
-          </form>
+            <div class="field-row">
+              <label for="savings-input">Total savings</label>
+              <div class="money-input"><span>$</span>
+                <input type="number" id="savings-input" min="0" step="0.01" placeholder="0" />
+              </div>
+            </div>
+            <p id="save-status" class="save-status">&nbsp;</p>
+
+            <button class="btn primary block" id="quick-add-btn">+ Add an expense</button>
+          </div>
+
+          <div class="card chart-card">
+            <h3>Spending breakdown</h3>
+            <div class="chart-wrap">
+              <canvas id="pie" width="320" height="320"></canvas>
+              <div id="chart-empty" class="chart-empty">No spending this month yet.</div>
+            </div>
+            <ul id="legend" class="legend"></ul>
+          </div>
         </div>
 
-        <!-- RIGHT: chart -->
-        <div class="card chart-card">
-          <h2>Spending breakdown</h2>
-          <div class="chart-wrap">
-            <canvas id="pie" width="320" height="320"></canvas>
-            <div id="chart-empty" class="chart-empty">
-              Add an expense to see your circle.
-            </div>
-          </div>
-          <ul id="legend" class="legend"></ul>
+        <div class="card">
+          <h3>This month's expenses</h3>
+          <ul id="expense-list" class="expense-list"></ul>
+          <p id="expense-empty" class="muted">Nothing logged this month.</p>
         </div>
       </div>
 
-      <!-- Expense list -->
-      <div class="card">
-        <h2>Expenses</h2>
-        <ul id="expense-list" class="expense-list"></ul>
-        <p id="expense-empty" class="muted">No expenses yet.</p>
+      <!-- ===== CALENDAR TAB ===== -->
+      <div id="tab-calendar" class="tab-panel" hidden>
+        <div class="card calendar-card">
+          <div class="weekdays">
+            <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span>
+            <span>Thu</span><span>Fri</span><span>Sat</span>
+          </div>
+          <div id="calendar-grid" class="calendar-grid"></div>
+          <p class="cal-hint muted">Tap any day to see or add what you spent.</p>
+        </div>
       </div>
     </main>
   </section>
+
+  <!-- ============ DAY DETAIL MODAL ============ -->
+  <div id="day-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel card" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <div>
+          <h3 id="modal-date">Day</h3>
+          <span class="modal-total muted" id="modal-total"></span>
+        </div>
+        <button class="icon-btn" id="modal-close" data-close aria-label="Close">×</button>
+      </div>
+
+      <ul id="day-expense-list" class="expense-list"></ul>
+      <p id="day-empty" class="muted">No spending recorded for this day.</p>
+
+      <hr />
+
+      <form id="day-form" class="day-form">
+        <div class="field-row">
+          <label for="day-category">Category</label>
+          <select id="day-category">
+            <option>Food &amp; Groceries</option>
+            <option>Rent &amp; Housing</option>
+            <option>Transport</option>
+            <option>Bills &amp; Utilities</option>
+            <option>Entertainment</option>
+            <option>Shopping</option>
+            <option>Health</option>
+            <option value="__custom__">Other / custom…</option>
+          </select>
+        </div>
+        <input type="text" id="day-custom" placeholder="Custom category name" hidden />
+        <div class="field-row two">
+          <div>
+            <label for="day-amount">Amount</label>
+            <div class="money-input"><span>$</span>
+              <input type="number" id="day-amount" min="0" step="0.01" placeholder="0" required />
+            </div>
+          </div>
+        </div>
+        <div class="field-row">
+          <label for="day-note">Details / note <span class="muted">(optional)</span></label>
+          <input type="text" id="day-note" placeholder="e.g. Lunch with team at Joe's" maxlength="200" />
+        </div>
+        <button type="submit" class="btn primary block">Add to this day</button>
+      </form>
+    </div>
+  </div>
 
   <script type="module" src="app.js"></script>
 </body>

@@ -1,8 +1,16 @@
-# 💰 Budget Circle
+# ⚡ QuickBudget
 
 A budget tracker with **real email + password accounts** and **cloud sync**.
-Enter your income, savings, and expenses by category, and see your spending split
-into a circle (doughnut chart).
+Log what you spend **on any day** from a calendar, add details to each expense,
+and see your monthly spending split into a circle (doughnut chart).
+
+**Features**
+- 📅 **Calendar view** — tap a day to see or add what you spent, with a per-day
+  spending heatmap.
+- 📝 **Details per expense** — category, amount, and an optional note.
+- 🍩 **Spending circle** — monthly breakdown by category.
+- 🔁 **Month navigation** — browse any month; summary + chart follow.
+- ☁️ **Cloud sync** across devices, secured by Row Level Security.
 
 - **Frontend:** static HTML/CSS/JS (no build step) — hosted on **Vercel**
 - **Auth + database:** **Supabase** (Postgres + Auth), secured with Row Level Security

@@ -12,16 +12,19 @@ create table if not exists public.budgets (
   updated_at timestamptz not null default now()
 );
 
--- Expenses (many per user)
+-- Expenses (many per user), each tied to the day it was spent
 create table if not exists public.expenses (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid not null references auth.users (id) on delete cascade,
   category   text not null,
   amount     numeric not null check (amount >= 0),
+  spent_on   date not null default current_date,
+  note       text,
   created_at timestamptz not null default now()
 );
 
 create index if not exists expenses_user_id_idx on public.expenses (user_id);
+create index if not exists expenses_spent_on_idx on public.expenses (user_id, spent_on);
 
 -- ----------------------------------------------------------------
 -- Row Level Security: every user can only see/touch their own rows
