@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QuickBudget — Track your money by the day</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body>
   <!-- Shown if Supabase keys aren't configured yet -->
@@ -132,10 +132,10 @@
           </div>
 
           <div class="card chart-card">
-            <h3>Spending breakdown</h3>
+            <h3>Income breakdown</h3>
             <div class="chart-wrap">
               <canvas id="pie" width="320" height="320"></canvas>
-              <div id="chart-empty" class="chart-empty">No spending this month yet.</div>
+              <div id="chart-empty" class="chart-empty">Add your income or an expense to see the breakdown.</div>
             </div>
             <ul id="legend" class="legend"></ul>
           </div>
@@ -251,6 +251,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=9"></script>
+  <script type="module" src="app.js?v=10"></script>
 </body>
 </html>

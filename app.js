@@ -301,9 +301,11 @@ function groupedExpenses(list) {
 }
 
 function renderChart() {
-  const groups = groupedExpenses(monthExpenses());
-  const total = groups.reduce((s, g) => s + g.amount, 0);
+  const groups = groupedExpenses(monthExpenses()).sort((a, b) => b.amount - a.amount);
+  const spent = groups.reduce((s, g) => s + g.amount, 0);
+  const income = Number(data.income) || 0;
   const ctx = canvas.getContext("2d");
+  const css = (v) => getComputedStyle(document.body).getPropertyValue(v).trim();
 
   const size = 320, dpr = window.devicePixelRatio || 1;
   canvas.width = size * dpr; canvas.height = size * dpr;
@@ -312,38 +314,83 @@ function renderChart() {
   ctx.clearRect(0, 0, size, size);
   legend.innerHTML = "";
 
-  if (total === 0) { chartEmpty.hidden = false; return; }
+  if (spent === 0 && income === 0) { chartEmpty.hidden = false; return; }
   chartEmpty.hidden = true;
 
-  const cx = size / 2, cy = size / 2, radius = 130, inner = 72;
+  // The whole circle represents INCOME; categories are shares of it, and the
+  // leftover is shown as a faded "Unspent" slice. If no income is set, fall
+  // back to splitting by spending so the circle still shows something.
+  const useIncome = income > 0;
+  const denom = useIncome ? Math.max(income, spent) : spent;
+  const base = useIncome ? income : spent; // legend percentages are out of this
+
+  const cx = size / 2, cy = size / 2, radius = 130, inner = 78;
   let start = -Math.PI / 2;
 
-  groups.sort((a, b) => b.amount - a.amount).forEach((g, i) => {
-    const slice = (g.amount / total) * Math.PI * 2;
-    const color = COLORS[i % COLORS.length];
+  const addLegend = (color, label, amount, faded) => {
+    const li = document.createElement("li");
+    const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = color;
+    const cat = document.createElement("span"); cat.className = "legend-cat"; cat.textContent = label;
+    if (faded) cat.style.color = css("--muted");
+    const val = document.createElement("span"); val.className = "legend-val";
+    val.textContent = `${fmt(amount)} · ${Math.round((amount / base) * 100)}%`;
+    li.append(dot, cat, val); legend.appendChild(li);
+  };
+
+  const drawSlice = (amount, color) => {
+    const slice = (amount / denom) * Math.PI * 2;
     ctx.beginPath(); ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, radius, start, start + slice); ctx.closePath();
     ctx.fillStyle = color; ctx.fill();
     start += slice;
+  };
 
-    const li = document.createElement("li");
-    const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = color;
-    const cat = document.createElement("span"); cat.className = "legend-cat"; cat.textContent = g.category;
-    const val = document.createElement("span"); val.className = "legend-val";
-    val.textContent = `${fmt(g.amount)} · ${Math.round((g.amount / total) * 100)}%`;
-    li.append(dot, cat, val); legend.appendChild(li);
+  // category shares
+  groups.forEach((g, i) => {
+    const color = COLORS[i % COLORS.length];
+    drawSlice(g.amount, color);
+    addLegend(color, g.category, g.amount, false);
   });
 
+  // unspent remainder of income
+  if (useIncome && income > spent) {
+    const remaining = income - spent;
+    const color = css("--card-2") || "#212741";
+    drawSlice(remaining, color);
+    addLegend(color, "Unspent", remaining, true);
+  }
+
+  // doughnut hole
   ctx.beginPath(); ctx.arc(cx, cy, inner, 0, Math.PI * 2);
-  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--card").trim() || "#1a1f38";
+  ctx.fillStyle = css("--card") || "#1a1f38";
   ctx.fill();
 
-  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--muted").trim();
-  ctx.font = "13px -apple-system, sans-serif"; ctx.textAlign = "center";
-  ctx.fillText("Spent this month", cx, cy - 8);
-  ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--text").trim();
-  ctx.font = "bold 22px -apple-system, sans-serif";
-  ctx.fillText(fmt(total), cx, cy + 16);
+  // center: income with total spent beneath it
+  ctx.textAlign = "center";
+  if (useIncome) {
+    ctx.fillStyle = css("--muted");
+    ctx.font = "12px -apple-system, sans-serif";
+    ctx.fillText("Income", cx, cy - 18);
+    ctx.fillStyle = css("--text");
+    ctx.font = "bold 24px -apple-system, sans-serif";
+    ctx.fillText(fmt(income), cx, cy + 6);
+    if (spent > income) {
+      ctx.fillStyle = css("--danger");
+      ctx.font = "12px -apple-system, sans-serif";
+      ctx.fillText("Over by " + fmt(spent - income), cx, cy + 26);
+    } else {
+      ctx.fillStyle = css("--muted");
+      ctx.font = "12px -apple-system, sans-serif";
+      ctx.fillText(fmt(spent) + " spent", cx, cy + 26);
+    }
+  } else {
+    ctx.fillStyle = css("--muted");
+    ctx.font = "13px -apple-system, sans-serif";
+    ctx.fillText("Spent this month", cx, cy - 8);
+    ctx.fillStyle = css("--text");
+    ctx.font = "bold 22px -apple-system, sans-serif";
+    ctx.fillText(fmt(spent), cx, cy + 16);
+  }
 }
 
 // ---------- Calendar ----------
@@ -629,7 +676,7 @@ function scheduleBudgetSave() {
   saveStatus.textContent = "…";
   saveTimer = setTimeout(saveBudget, 600);
 }
-incomeInput.addEventListener("input", () => { data.income = parseFloat(incomeInput.value) || 0; renderSummary(); scheduleBudgetSave(); });
+incomeInput.addEventListener("input", () => { data.income = parseFloat(incomeInput.value) || 0; renderSummary(); renderChart(); scheduleBudgetSave(); });
 savingsInput.addEventListener("input", () => { data.savings = parseFloat(savingsInput.value) || 0; renderSummary(); scheduleBudgetSave(); });
 
 window.addEventListener("resize", () => { if (!appView.hidden && !$("tab-overview").hidden) renderChart(); });
