@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QuickBudget — Track your money by the day</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="styles.css?v=7" />
+  <link rel="stylesheet" href="styles.css?v=8" />
 </head>
 <body>
   <!-- Shown if Supabase keys aren't configured yet -->
@@ -103,24 +103,32 @@
           </div>
         </div>
 
-        <div class="grid">
-          <div class="card">
-            <h3>Your money</h3>
-            <div class="field-row">
-              <label for="income-input">Monthly income</label>
-              <div class="money-input"><span>$</span>
-                <input type="number" id="income-input" min="0" step="0.01" placeholder="0" />
+        <div class="overview-grid">
+          <div class="ov-col">
+            <div class="card">
+              <h3>Your money</h3>
+              <div class="field-row">
+                <label for="income-input">Monthly income</label>
+                <div class="money-input"><span>$</span>
+                  <input type="number" id="income-input" min="0" step="0.01" placeholder="0" />
+                </div>
               </div>
-            </div>
-            <div class="field-row">
-              <label for="savings-input">Total savings</label>
-              <div class="money-input"><span>$</span>
-                <input type="number" id="savings-input" min="0" step="0.01" placeholder="0" />
+              <div class="field-row">
+                <label for="savings-input">Total savings</label>
+                <div class="money-input"><span>$</span>
+                  <input type="number" id="savings-input" min="0" step="0.01" placeholder="0" />
+                </div>
               </div>
-            </div>
-            <p id="save-status" class="save-status">&nbsp;</p>
+              <p id="save-status" class="save-status">&nbsp;</p>
 
-            <button class="btn primary block" id="quick-add-btn">+ Add an expense</button>
+              <button class="btn primary block" id="quick-add-btn">+ Add an expense</button>
+            </div>
+
+            <div class="card">
+              <h3>This month's expenses</h3>
+              <ul id="expense-list" class="expense-list"></ul>
+              <p id="expense-empty" class="muted">Nothing logged this month.</p>
+            </div>
           </div>
 
           <div class="card chart-card">
@@ -131,12 +139,6 @@
             </div>
             <ul id="legend" class="legend"></ul>
           </div>
-        </div>
-
-        <div class="card">
-          <h3>This month's expenses</h3>
-          <ul id="expense-list" class="expense-list"></ul>
-          <p id="expense-empty" class="muted">Nothing logged this month.</p>
         </div>
       </div>
 
@@ -249,6 +251,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=7"></script>
+  <script type="module" src="app.js?v=8"></script>
 </body>
 </html>

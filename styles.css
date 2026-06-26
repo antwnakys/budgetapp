@@ -130,6 +130,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start; }
 
+/* Overview: left column (money + expenses) beside the chart, balanced heights */
+.overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: start; }
+.ov-col { display: flex; flex-direction: column; gap: 30px; }
+
 /* ---------- Inputs / buttons ---------- */
 .field-row { margin-bottom: 14px; }
 .field-row.two { display: flex; gap: 12px; }
@@ -279,7 +283,7 @@ input:focus, select:focus { border-color: var(--primary); }
   .topbar { flex-wrap: wrap; gap: 12px; }
   .tabs { order: 3; width: 100%; }
   .user-box { margin-left: 0; }
-  .grid { grid-template-columns: 1fr; }
+  .grid, .overview-grid { grid-template-columns: 1fr; }
   .summary { grid-template-columns: repeat(2, 1fr); }
   .day-cell { padding: 5px; border-radius: 10px; }
   .day-spent { font-size: 11px; }
