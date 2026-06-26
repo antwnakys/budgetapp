@@ -170,11 +170,19 @@ document.querySelectorAll(".tab").forEach((btn) => {
     $("tab-overview").hidden = tab !== "overview";
     $("tab-calendar").hidden = tab !== "calendar";
     $("tab-family").hidden = tab !== "family";
-    // the month switcher only applies to Overview/Calendar
-    $("month-bar").style.display = tab === "family" ? "none" : "flex";
+    updateMonthBar();
     if (tab === "overview") renderChart(); // redraw canvas crisply when revealed
+    if (tab === "family") renderFamilyOverview();
   });
 });
+
+// The month switcher applies to all tabs except a Family tab with no group
+function updateMonthBar() {
+  const active = document.querySelector(".tab.active");
+  const tab = active ? active.dataset.tab : "overview";
+  const show = tab !== "family" || !!activeGroup;
+  $("month-bar").style.display = show ? "flex" : "none";
+}
 
 // ===================== MONTH NAV =====================
 $("prev-month").addEventListener("click", () => { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1); renderAll(); });
@@ -239,6 +247,7 @@ function renderAll() {
   renderExpenseList();
   renderChart();
   renderCalendar();
+  if (activeGroup) renderFamilyOverview(); // keep family overview in sync with the month
 }
 
 function renderSummary() {
@@ -301,21 +310,26 @@ function groupedExpenses(list) {
 }
 
 function renderChart() {
-  const groups = groupedExpenses(monthExpenses()).sort((a, b) => b.amount - a.amount);
-  const spent = groups.reduce((s, g) => s + g.amount, 0);
-  const income = Number(data.income) || 0;
-  const ctx = canvas.getContext("2d");
+  const monthExp = monthExpenses();
+  const spent = monthExp.reduce((s, e) => s + e.amount, 0);
+  drawDonut(canvas, legend, chartEmpty, groupedExpenses(monthExp), spent, Number(data.income) || 0);
+}
+
+// Reusable donut: whole circle = income, categories are shares, leftover faded
+function drawDonut(canvasEl, legendEl, emptyEl, groupsIn, spent, income) {
+  const groups = groupsIn.slice().sort((a, b) => b.amount - a.amount);
+  const ctx = canvasEl.getContext("2d");
   const css = (v) => getComputedStyle(document.body).getPropertyValue(v).trim();
 
   const size = 320, dpr = window.devicePixelRatio || 1;
-  canvas.width = size * dpr; canvas.height = size * dpr;
-  canvas.style.width = size + "px"; canvas.style.height = size + "px";
+  canvasEl.width = size * dpr; canvasEl.height = size * dpr;
+  canvasEl.style.width = size + "px"; canvasEl.style.height = size + "px";
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, size, size);
-  legend.innerHTML = "";
+  legendEl.innerHTML = "";
 
-  if (spent === 0 && income === 0) { chartEmpty.hidden = false; return; }
-  chartEmpty.hidden = true;
+  if (spent === 0 && income === 0) { emptyEl.hidden = false; return; }
+  emptyEl.hidden = true;
 
   // The whole circle represents INCOME; categories are shares of it, and the
   // leftover is shown as a faded "Unspent" slice. If no income is set, fall
@@ -334,7 +348,7 @@ function renderChart() {
     if (faded) cat.style.color = css("--muted");
     const val = document.createElement("span"); val.className = "legend-val";
     val.textContent = `${fmt(amount)} · ${Math.round((amount / base) * 100)}%`;
-    li.append(dot, cat, val); legend.appendChild(li);
+    li.append(dot, cat, val); legendEl.appendChild(li);
   };
 
   const drawSlice = (amount, color) => {
@@ -504,6 +518,9 @@ $("quick-add-btn").addEventListener("click", () => openDay(ymd(new Date())));
 let ownedGroup = null;     // group this user owns: { id, name, owner_id }
 let ownedMembers = [];     // members of the owned group
 let memberGroups = [];     // [{ group, members }] groups the user was added to
+let activeGroup = null;    // the group whose combined overview we show
+let familyData = { income: 0, savings: 0, expenses: [] };
+let familyFnMissing = false; // true if the group_overview SQL hasn't been run
 
 const ROLE_LABELS = { owner: "Owner", parent: "Parent", kid: "Kid", teen: "Teen", member: "Member" };
 function roleLabel(r) { return ROLE_LABELS[r] || "Member"; }
@@ -526,12 +543,33 @@ async function loadGroups() {
   for (const g of groups.filter((g) => g.owner_id !== user.id)) {
     memberGroups.push({ group: g, members: await fetchMembers(g.id) });
   }
+
+  // the group we show a combined overview for: your own, else the first you're in
+  activeGroup = ownedGroup || (memberGroups[0] && memberGroups[0].group) || null;
+  await loadFamilyOverview();
 }
 
 async function fetchMembers(groupId) {
   const { data } = await supabase.from("group_members")
     .select("id, email, role, user_id").eq("group_id", groupId).order("created_at");
   return data || [];
+}
+
+async function loadFamilyOverview() {
+  familyData = { income: 0, savings: 0, expenses: [] };
+  familyFnMissing = false;
+  if (!activeGroup) return;
+  const { data, error } = await supabase.rpc("group_overview", { gid: activeGroup.id });
+  if (error) { familyFnMissing = error.code === "PGRST202"; return; }
+  if (!data) return;
+  familyData = {
+    income: Number(data.income) || 0,
+    savings: Number(data.savings) || 0,
+    expenses: (data.expenses || []).map((e) => ({
+      category: e.category, amount: Number(e.amount),
+      spent_on: e.spent_on, note: e.note || "", email: e.email,
+    })),
+  };
 }
 
 function memberRow(m, editable) {
@@ -584,6 +622,8 @@ function memberRow(m, editable) {
 }
 
 function renderFamily() {
+  renderFamilyOverview();
+  updateMonthBar();
   $("create-group-card").hidden = !!ownedGroup;
   $("group-card").hidden = !ownedGroup;
 
@@ -609,6 +649,70 @@ function renderFamily() {
     members.forEach((m) => ul.appendChild(memberRow(m, false)));
     wrap.append(title, ul);
   });
+}
+
+function familyExpenseRow(exp, i) {
+  const li = document.createElement("li");
+  const main = document.createElement("div");
+  main.className = "expense-main";
+  const dot = document.createElement("span");
+  dot.className = "expense-dot";
+  dot.style.background = COLORS[i % COLORS.length];
+  const text = document.createElement("div");
+  text.className = "expense-text";
+  const cat = document.createElement("div");
+  cat.className = "expense-cat";
+  cat.textContent = exp.category;
+  const meta = document.createElement("div");
+  meta.className = "expense-meta";
+  const dateStr = exp.spent_on ? exp.spent_on.split("-").slice(1).reverse().join("/") : "";
+  const who = (exp.email || "").split("@")[0];
+  meta.textContent = [dateStr, who, exp.note].filter(Boolean).join(" · ");
+  text.append(cat, meta);
+  main.append(dot, text);
+
+  const right = document.createElement("div");
+  right.className = "expense-right";
+  const amt = document.createElement("span");
+  amt.className = "expense-amount";
+  amt.textContent = fmt(exp.amount);
+  right.append(amt);
+
+  li.append(main, right);
+  return li;
+}
+
+function renderFamilyOverview() {
+  const sec = $("family-overview");
+  if (!activeGroup) { sec.hidden = true; return; }
+  sec.hidden = false;
+
+  $("fam-title").textContent = activeGroup.name;
+  $("fam-note").hidden = !familyFnMissing;
+  if (familyFnMissing) {
+    $("fam-note").textContent = "Run supabase/migration_family_overview.sql to see combined family totals.";
+    $("fam-note").className = "msg error";
+  }
+
+  const p = monthPrefix(viewMonth);
+  const monthExp = familyData.expenses.filter((e) => e.spent_on && e.spent_on.startsWith(p));
+  const spent = monthExp.reduce((s, e) => s + e.amount, 0);
+  const income = familyData.income;
+
+  $("fam-stat-income").textContent = fmt(income);
+  $("fam-stat-spent").textContent = fmt(spent);
+  $("fam-stat-savings").textContent = fmt(familyData.savings);
+  const left = income - spent;
+  const le = $("fam-stat-left");
+  le.textContent = fmt(left);
+  le.style.color = left < 0 ? "var(--danger)" : "var(--good)";
+
+  const ul = $("fam-expense-list");
+  ul.innerHTML = "";
+  $("fam-expense-empty").hidden = monthExp.length > 0;
+  monthExp.forEach((e, i) => ul.appendChild(familyExpenseRow(e, i)));
+
+  drawDonut($("fam-pie"), $("fam-legend"), $("fam-chart-empty"), groupedExpenses(monthExp), spent, income);
 }
 
 function memberMsg(text, kind) {

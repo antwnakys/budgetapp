@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QuickBudget — Track your money by the day</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="styles.css?v=10" />
+  <link rel="stylesheet" href="styles.css?v=11" />
 </head>
 <body>
   <!-- Shown if Supabase keys aren't configured yet -->
@@ -156,6 +156,50 @@
 
       <!-- ===== FAMILY TAB ===== -->
       <div id="tab-family" class="tab-panel" hidden>
+        <!-- Combined family budget overview -->
+        <div id="family-overview" hidden>
+          <h2 class="fam-title" id="fam-title">Family</h2>
+          <div class="summary">
+            <div class="stat">
+              <span class="stat-label">Family income</span>
+              <span class="stat-value" id="fam-stat-income">$0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Spent this month</span>
+              <span class="stat-value" id="fam-stat-spent">$0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Family savings</span>
+              <span class="stat-value" id="fam-stat-savings">$0</span>
+            </div>
+            <div class="stat highlight">
+              <span class="stat-label">Left over</span>
+              <span class="stat-value" id="fam-stat-left">$0</span>
+            </div>
+          </div>
+
+          <div class="overview-grid">
+            <div class="ov-col">
+              <div class="card">
+                <h3>This month — who spent what</h3>
+                <ul id="fam-expense-list" class="expense-list"></ul>
+                <p id="fam-expense-empty" class="muted">No family spending this month.</p>
+              </div>
+            </div>
+
+            <div class="card chart-card">
+              <h3>Family income breakdown</h3>
+              <div class="chart-wrap">
+                <canvas id="fam-pie" width="320" height="320"></canvas>
+                <div id="fam-chart-empty" class="chart-empty">No family data yet.</div>
+              </div>
+              <ul id="fam-legend" class="legend"></ul>
+            </div>
+          </div>
+
+          <p id="fam-note" class="msg" hidden></p>
+        </div>
+
         <!-- When you don't own a group yet -->
         <div class="card" id="create-group-card" hidden>
           <h3>Create your family group</h3>
@@ -251,6 +295,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=10"></script>
+  <script type="module" src="app.js?v=11"></script>
 </body>
 </html>
