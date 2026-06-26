@@ -1,49 +1,63 @@
 # 💰 Budget Circle
 
-A simple, no-backend budget tracker. Sign in with your email, enter your income,
-savings and expenses by category, and see your spending split into a circle
-(doughnut chart).
+A budget tracker with **real email + password accounts** and **cloud sync**.
+Enter your income, savings, and expenses by category, and see your spending split
+into a circle (doughnut chart).
 
-Everything runs in the browser and saves to `localStorage`, so it works perfectly
-on **GitHub Pages** with zero server setup.
+- **Frontend:** static HTML/CSS/JS (no build step) — hosted on **Vercel**
+- **Auth + database:** **Supabase** (Postgres + Auth), secured with Row Level Security
 
-## Features
+Your data lives in your own Supabase project and syncs across devices.
 
-- **Email sign-in** — your data is saved per-email in your browser.
-- **Income, savings & remaining** — live summary cards.
-- **Expenses by category** — preset categories or your own custom ones.
-- **Spending circle** — a doughnut chart showing how your money splits, with
-  percentages and a legend.
-- **Fully offline** — no CDNs, no tracking, no accounts on a server.
+## Setup (one-time)
 
-## Run it locally
+### 1. Create a Supabase project
+1. Go to <https://supabase.com> → sign in → **New project** (free tier is fine).
+2. Once it's ready, open **SQL Editor → New query**, paste the contents of
+   [`supabase/schema.sql`](supabase/schema.sql), and click **Run**. This creates
+   the `budgets` and `expenses` tables with per-user security.
+3. Open **Project Settings → API** and copy:
+   - **Project URL**
+   - **anon / public** key
 
-Just open `index.html` in a browser. (Or serve the folder, e.g.
-`python3 -m http.server`, then visit http://localhost:8000.)
+### 2. Add your keys
+Edit [`config.js`](config.js) and paste the two values:
+```js
+export const SUPABASE_URL = "https://xxxxx.supabase.co";
+export const SUPABASE_ANON_KEY = "eyJhbGci...";
+```
+The anon key is **safe to commit** — it's a public key, and Row Level Security
+keeps each user's data private.
 
-## Deploy to GitHub Pages
+### 3. (Optional) Instant signups
+By default Supabase requires email confirmation. For testing you can turn it off:
+**Authentication → Providers → Email → uncheck "Confirm email"**. Leave it on for
+real use.
 
-1. Create a new repository on GitHub (e.g. `budgetapp`).
-2. Push these files to it:
-   ```bash
-   git init
-   git add .
-   git commit -m "Budget Circle"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/budgetapp.git
-   git push -u origin main
-   ```
-3. On GitHub: **Settings → Pages → Build and deployment**.
-   Set **Source = Deploy from a branch**, **Branch = main**, folder **/ (root)**.
-4. Wait ~1 minute. Your site will be live at:
-   `https://<your-username>.github.io/budgetapp/`
+## Run locally
+Because the app uses ES module imports, open it through a local server (not
+`file://`):
+```bash
+python3 -m http.server 8000
+# visit http://localhost:8000
+```
 
-## About the "sign in with email"
+## Deploy to Vercel
+1. Go to <https://vercel.com> → sign in with GitHub.
+2. **Add New → Project** → import the `budgetapp` repo.
+3. Framework preset: **Other**. No build command, no output dir (it's static).
+4. **Deploy.** You'll get a `https://budgetapp-xxxx.vercel.app` URL.
 
-This version stores data **locally in the browser** under the email you enter —
-it is not real authentication, and there's no password or cloud sync. That's the
-only option that works on plain GitHub Pages (which has no server).
+After deploying, add your Vercel URL to Supabase under
+**Authentication → URL Configuration → Site URL / Redirect URLs** so auth links
+resolve correctly.
 
-To get **real accounts with email login + cloud sync**, you'd add a free service
-like [Firebase Authentication](https://firebase.google.com/docs/auth) or
-[Supabase](https://supabase.com/). Ask and this can be wired up.
+## Files
+| File | Purpose |
+|------|---------|
+| `index.html` | Markup for the sign-in screen and dashboard |
+| `styles.css` | Styling |
+| `app.js` | Auth, data layer, and the spending circle |
+| `config.js` | Your Supabase URL + anon key |
+| `supabase/schema.sql` | Database tables + Row Level Security |
+| `vercel.json` | Vercel static-hosting config |
