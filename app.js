@@ -85,9 +85,18 @@ async function signUp() {
 }
 
 if (supabase) {
-  supabase.auth.onAuthStateChange(async (_e, session) => {
-    if (session && session.user) { user = session.user; await enterApp(); }
-    else { user = null; appView.hidden = true; authView.hidden = false; passwordInput.value = ""; }
+  supabase.auth.onAuthStateChange((_e, session) => {
+    // NOTE: do NOT call supabase data/auth methods directly inside this
+    // callback — Supabase holds an internal lock here and awaiting another
+    // Supabase call deadlocks. Defer with setTimeout so it runs after the
+    // lock is released.
+    if (session && session.user) {
+      user = session.user;
+      setTimeout(() => { enterApp(); }, 0);
+    } else {
+      user = null;
+      appView.hidden = true; authView.hidden = false; passwordInput.value = "";
+    }
   });
 }
 
