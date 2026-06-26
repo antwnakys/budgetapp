@@ -573,13 +573,17 @@ $("create-group-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("group-name-input").value.trim();
   if (!name) return;
-  const { data: g, error } = await supabase.from("groups")
-    .insert({ name, owner_id: user.id }).select("id, name, owner_id").single();
+  // Insert WITHOUT selecting the row back. An INSERT ... RETURNING is rejected
+  // by the SELECT policy here (its STABLE function can't see the just-inserted
+  // row in the same statement). A plain insert + re-fetch works reliably.
+  const { error } = await supabase.from("groups").insert({ name, owner_id: user.id });
   if (error) { alert("Could not create group: " + error.message); return; }
-  // add the owner as a member row
-  await supabase.from("group_members")
-    .insert({ group_id: g.id, email: user.email, user_id: user.id, role: "owner" });
   await loadGroups();
+  if (ownedGroup) {
+    await supabase.from("group_members")
+      .insert({ group_id: ownedGroup.id, email: user.email.toLowerCase(), user_id: user.id, role: "owner" });
+    ownedMembers = await fetchMembers(ownedGroup.id);
+  }
   renderFamily();
 });
 
