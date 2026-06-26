@@ -551,7 +551,7 @@ async function loadGroups() {
 
 async function fetchMembers(groupId) {
   const { data } = await supabase.from("group_members")
-    .select("id, email, role, user_id").eq("group_id", groupId).order("created_at");
+    .select("id, email, role, user_id, allowance").eq("group_id", groupId).order("created_at");
   return data || [];
 }
 
@@ -605,6 +605,20 @@ function memberRow(m, editable) {
   actions.className = "member-actions";
 
   if (editable && m.role !== "owner") {
+    // allowance input sits right next to the email for kids & teens
+    if (m.role === "kid" || m.role === "teen") {
+      const wrap = document.createElement("div");
+      wrap.className = "money-input";
+      const dollar = document.createElement("span"); dollar.textContent = "$";
+      const allow = document.createElement("input");
+      allow.type = "number"; allow.min = "0"; allow.step = "0.01";
+      allow.className = "allow-input"; allow.title = "Allowance";
+      allow.placeholder = "Allowance";
+      allow.value = m.allowance ? Number(m.allowance) : "";
+      allow.addEventListener("change", () => setMemberAllowance(m.id, parseFloat(allow.value) || 0));
+      wrap.append(dollar, allow);
+      actions.append(wrap);
+    }
     const sel = document.createElement("select");
     sel.className = "role-select";
     [["parent", "Parent"], ["kid", "Kid"], ["teen", "Teen"], ["member", "Member"]].forEach(([v, l]) => {
@@ -766,47 +780,8 @@ function renderFamilyOverview() {
 
   if (!isKid) drawDonut($("fam-pie"), $("fam-legend"), $("fam-chart-empty"), groupedExpenses(monthExp), spent, income);
 
-  // owner/parent: manage kids' & teens' allowances
-  const kids = familyData.members.filter((m) => m.role === "kid" || m.role === "teen");
-  $("fam-manage-allowances").hidden = !(isEditor && kids.length > 0);
-  if (isEditor && kids.length > 0) renderAllowanceManager(kids);
-}
-
-function renderAllowanceManager(kids) {
-  const ul = $("fam-allow-list");
-  ul.innerHTML = "";
-  kids.forEach((m) => {
-    const li = document.createElement("li");
-    li.className = "member-row";
-    const av = avatarFor(m.email);
-    const avatar = document.createElement("div");
-    avatar.className = "member-avatar";
-    avatar.style.background = av.color;
-    avatar.textContent = av.ch;
-    const info = document.createElement("div");
-    info.className = "member-info";
-    const name = document.createElement("div");
-    name.className = "member-email";
-    name.textContent = m.email.split("@")[0];
-    const sub = document.createElement("div");
-    sub.className = "member-sub";
-    const remaining = m.allowance - m.spent;
-    sub.textContent = `${roleLabel(m.role)} · spent ${fmt(m.spent)} · ${fmt(remaining)} left`;
-    info.append(name, sub);
-    const actions = document.createElement("div");
-    actions.className = "member-actions";
-    const inWrap = document.createElement("div");
-    inWrap.className = "money-input";
-    const dollar = document.createElement("span"); dollar.textContent = "$";
-    const input = document.createElement("input");
-    input.type = "number"; input.min = "0"; input.step = "0.01";
-    input.className = "allow-input"; input.value = m.allowance || "";
-    input.addEventListener("change", () => setMemberAllowance(m.member_id, parseFloat(input.value) || 0));
-    inWrap.append(dollar, input);
-    actions.append(inWrap);
-    li.append(avatar, info, actions);
-    ul.appendChild(li);
-  });
+  // allowances are now managed inline in the member roster (next to each email)
+  $("fam-manage-allowances").hidden = true;
 }
 
 function memberMsg(text, kind) {
@@ -900,8 +875,9 @@ $("fam-savings-input").addEventListener("input", famMoneyInput);
 async function setMemberAllowance(memberId, value) {
   const { error } = await supabase.rpc("set_member_allowance", { p_member: memberId, p_allowance: value });
   if (error) { alert("Couldn't set allowance: " + error.message); return; }
+  if (ownedGroup) ownedMembers = await fetchMembers(ownedGroup.id);
   await loadFamilyOverview();
-  renderFamilyOverview();
+  renderFamily();
 }
 
 async function removeFamilyExpense(id) {
