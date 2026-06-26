@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QuickBudget — Track your money by the day</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="styles.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=6" />
 </head>
 <body>
   <!-- Shown if Supabase keys aren't configured yet -->
@@ -51,6 +51,7 @@
       <nav class="tabs">
         <button class="tab active" data-tab="overview">Overview</button>
         <button class="tab" data-tab="calendar">Calendar</button>
+        <button class="tab" data-tab="family">Family</button>
       </nav>
       <div class="user-box">
         <span id="user-email"></span>
@@ -60,7 +61,7 @@
 
     <main class="dashboard">
       <!-- Shared month switcher -->
-      <div class="month-bar">
+      <div class="month-bar" id="month-bar">
         <button class="nav-btn" id="prev-month" aria-label="Previous month">‹</button>
         <div class="month-picker-wrap">
           <button id="month-label" class="month-label-btn">Month</button>
@@ -150,6 +151,52 @@
           <p class="cal-hint muted">Tap any day to see or add what you spent.</p>
         </div>
       </div>
+
+      <!-- ===== FAMILY TAB ===== -->
+      <div id="tab-family" class="tab-panel" hidden>
+        <!-- When you don't own a group yet -->
+        <div class="card" id="create-group-card" hidden>
+          <h3>Create your family group</h3>
+          <p class="muted">Add your household, invite people by email, and give each person a role like Parent or Kid.</p>
+          <form id="create-group-form" class="create-group-form">
+            <input type="text" id="group-name-input" placeholder="e.g. The Smiths" maxlength="60" required />
+            <button class="btn primary" type="submit">Create group</button>
+          </form>
+        </div>
+
+        <!-- The group you own -->
+        <div class="card" id="group-card" hidden>
+          <div class="group-head">
+            <div>
+              <h3 id="group-name">Family</h3>
+              <span class="muted" id="group-sub"></span>
+            </div>
+            <span class="owner-tag">You're the owner</span>
+          </div>
+          <ul id="member-list" class="member-list"></ul>
+
+          <hr />
+
+          <h3>Add someone</h3>
+          <form id="add-member-form" class="add-member-form">
+            <input type="email" id="member-email" placeholder="their@email.com" autocomplete="off" required />
+            <select id="member-role">
+              <option value="parent">Parent</option>
+              <option value="kid">Kid</option>
+              <option value="teen">Teen</option>
+              <option value="member">Member</option>
+            </select>
+            <button class="btn primary" type="submit">Add</button>
+          </form>
+          <p id="member-msg" class="msg" hidden></p>
+        </div>
+
+        <!-- Groups you've been added to (read-only) -->
+        <div class="card" id="member-of-card" hidden>
+          <h3>Groups you're in</h3>
+          <div id="member-of-list"></div>
+        </div>
+      </div>
     </main>
   </section>
 
@@ -202,6 +249,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=5"></script>
+  <script type="module" src="app.js?v=6"></script>
 </body>
 </html>

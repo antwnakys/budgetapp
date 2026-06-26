@@ -157,6 +157,8 @@ async function enterApp() {
   incomeInput.value = data.income || "";
   savingsInput.value = data.savings || "";
   renderAll();
+  await loadGroups();
+  renderFamily();
 }
 
 // ===================== TABS =====================
@@ -167,6 +169,9 @@ document.querySelectorAll(".tab").forEach((btn) => {
     const tab = btn.dataset.tab;
     $("tab-overview").hidden = tab !== "overview";
     $("tab-calendar").hidden = tab !== "calendar";
+    $("tab-family").hidden = tab !== "family";
+    // the month switcher only applies to Overview/Calendar
+    $("month-bar").style.display = tab === "family" ? "none" : "flex";
     if (tab === "overview") renderChart(); // redraw canvas crisply when revealed
   });
 });
@@ -447,6 +452,171 @@ $("day-form").addEventListener("submit", async (e) => {
 
 // Quick-add button on Overview → opens today's modal
 $("quick-add-btn").addEventListener("click", () => openDay(ymd(new Date())));
+
+// ===================== FAMILY / GROUPS =====================
+let ownedGroup = null;     // group this user owns: { id, name, owner_id }
+let ownedMembers = [];     // members of the owned group
+let memberGroups = [];     // [{ group, members }] groups the user was added to
+
+const ROLE_LABELS = { owner: "Owner", parent: "Parent", kid: "Kid", teen: "Teen", member: "Member" };
+function roleLabel(r) { return ROLE_LABELS[r] || "Member"; }
+
+function avatarFor(email) {
+  const e = (email || "?").trim();
+  let h = 0;
+  for (const c of e) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return { ch: (e[0] || "?").toUpperCase(), color: COLORS[h % COLORS.length] };
+}
+
+async function loadGroups() {
+  ownedGroup = null; ownedMembers = []; memberGroups = [];
+  const { data: groups, error } = await supabase.from("groups").select("id, name, owner_id");
+  if (error || !groups) return; // tables not set up yet → Family tab shows the create form
+
+  ownedGroup = groups.find((g) => g.owner_id === user.id) || null;
+  if (ownedGroup) ownedMembers = await fetchMembers(ownedGroup.id);
+
+  for (const g of groups.filter((g) => g.owner_id !== user.id)) {
+    memberGroups.push({ group: g, members: await fetchMembers(g.id) });
+  }
+}
+
+async function fetchMembers(groupId) {
+  const { data } = await supabase.from("group_members")
+    .select("id, email, role, user_id").eq("group_id", groupId).order("created_at");
+  return data || [];
+}
+
+function memberRow(m, editable) {
+  const li = document.createElement("li");
+  li.className = "member-row";
+
+  const av = avatarFor(m.email);
+  const avatar = document.createElement("div");
+  avatar.className = "member-avatar";
+  avatar.style.background = av.color;
+  avatar.textContent = av.ch;
+
+  const info = document.createElement("div");
+  info.className = "member-info";
+  const email = document.createElement("div");
+  email.className = "member-email";
+  const isYou = m.email.toLowerCase() === user.email.toLowerCase();
+  email.textContent = m.email + (isYou ? " (you)" : "");
+  const sub = document.createElement("div");
+  sub.className = "member-sub";
+  sub.textContent = m.role === "owner" ? "Owner" : (m.user_id ? "Joined" : "Invited");
+  info.append(email, sub);
+
+  const actions = document.createElement("div");
+  actions.className = "member-actions";
+
+  if (editable && m.role !== "owner") {
+    const sel = document.createElement("select");
+    sel.className = "role-select";
+    [["parent", "Parent"], ["kid", "Kid"], ["teen", "Teen"], ["member", "Member"]].forEach(([v, l]) => {
+      const o = document.createElement("option");
+      o.value = v; o.textContent = l;
+      if (m.role === v) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.addEventListener("change", () => updateMemberRole(m.id, sel.value));
+    const del = document.createElement("button");
+    del.className = "del-btn"; del.innerHTML = "&times;"; del.title = "Remove";
+    del.addEventListener("click", () => removeMember(m.id, m.email));
+    actions.append(sel, del);
+  } else {
+    const badge = document.createElement("span");
+    badge.className = "role-badge role-" + m.role;
+    badge.textContent = roleLabel(m.role);
+    actions.append(badge);
+  }
+
+  li.append(avatar, info, actions);
+  return li;
+}
+
+function renderFamily() {
+  $("create-group-card").hidden = !!ownedGroup;
+  $("group-card").hidden = !ownedGroup;
+
+  if (ownedGroup) {
+    $("group-name").textContent = ownedGroup.name;
+    $("group-sub").textContent = `${ownedMembers.length} member${ownedMembers.length !== 1 ? "s" : ""}`;
+    const ul = $("member-list");
+    ul.innerHTML = "";
+    [...ownedMembers]
+      .sort((a, b) => (a.role === "owner" ? -1 : b.role === "owner" ? 1 : 0))
+      .forEach((m) => ul.appendChild(memberRow(m, true)));
+  }
+
+  $("member-of-card").hidden = memberGroups.length === 0;
+  const wrap = $("member-of-list");
+  wrap.innerHTML = "";
+  memberGroups.forEach(({ group, members }) => {
+    const title = document.createElement("div");
+    title.className = "group-sub-title";
+    title.textContent = group.name;
+    const ul = document.createElement("ul");
+    ul.className = "member-list";
+    members.forEach((m) => ul.appendChild(memberRow(m, false)));
+    wrap.append(title, ul);
+  });
+}
+
+function memberMsg(text, kind) {
+  const el = $("member-msg");
+  el.textContent = text; el.className = "msg " + (kind || ""); el.hidden = !text;
+}
+
+$("create-group-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("group-name-input").value.trim();
+  if (!name) return;
+  const { data: g, error } = await supabase.from("groups")
+    .insert({ name, owner_id: user.id }).select("id, name, owner_id").single();
+  if (error) { alert("Could not create group: " + error.message); return; }
+  // add the owner as a member row
+  await supabase.from("group_members")
+    .insert({ group_id: g.id, email: user.email, user_id: user.id, role: "owner" });
+  await loadGroups();
+  renderFamily();
+});
+
+$("add-member-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!ownedGroup) return;
+  const email = $("member-email").value.trim().toLowerCase();
+  const role = $("member-role").value;
+  if (!email) return;
+  if (email === user.email.toLowerCase()) { memberMsg("That's you — you're already the owner.", "error"); return; }
+
+  const { error } = await supabase.from("group_members")
+    .insert({ group_id: ownedGroup.id, email, role });
+  if (error) {
+    memberMsg(error.code === "23505" ? "That email is already in the group." : error.message, "error");
+    return;
+  }
+  memberMsg(`Added ${email} as ${roleLabel(role)}.`, "success");
+  $("member-email").value = "";
+  ownedMembers = await fetchMembers(ownedGroup.id);
+  renderFamily();
+});
+
+async function updateMemberRole(id, role) {
+  const { error } = await supabase.from("group_members").update({ role }).eq("id", id);
+  if (error) { alert("Could not update role: " + error.message); return; }
+  ownedMembers = await fetchMembers(ownedGroup.id);
+  renderFamily();
+}
+
+async function removeMember(id, email) {
+  if (!confirm(`Remove ${email} from the group?`)) return;
+  const { error } = await supabase.from("group_members").delete().eq("id", id);
+  if (error) { alert("Could not remove: " + error.message); return; }
+  ownedMembers = await fetchMembers(ownedGroup.id);
+  renderFamily();
+}
 
 // ===================== BUDGET INPUTS =====================
 let saveTimer = null;
