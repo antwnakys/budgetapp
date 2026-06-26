@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QuickBudget — Track your money by the day</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="styles.css?v=11" />
+  <link rel="stylesheet" href="styles.css?v=12" />
 </head>
 <body>
   <!-- Shown if Supabase keys aren't configured yet -->
@@ -158,8 +158,12 @@
       <div id="tab-family" class="tab-panel" hidden>
         <!-- Combined family budget overview -->
         <div id="family-overview" hidden>
-          <h2 class="fam-title" id="fam-title">Family</h2>
-          <div class="summary">
+          <div class="group-head">
+            <h2 class="fam-title" id="fam-title">Family</h2>
+            <span class="owner-tag" id="fam-role-tag"></span>
+          </div>
+
+          <div class="summary" id="fam-summary">
             <div class="stat">
               <span class="stat-label">Family income</span>
               <span class="stat-value" id="fam-stat-income">$0</span>
@@ -180,14 +184,43 @@
 
           <div class="overview-grid">
             <div class="ov-col">
+              <!-- Owner / Parent: edit the shared family money -->
+              <div class="card" id="fam-money-card" hidden>
+                <h3>Family money</h3>
+                <div class="field-row">
+                  <label for="fam-income-input">Family income</label>
+                  <div class="money-input"><span>$</span>
+                    <input type="number" id="fam-income-input" min="0" step="0.01" placeholder="0" />
+                  </div>
+                </div>
+                <div class="field-row">
+                  <label for="fam-savings-input">Family savings</label>
+                  <div class="money-input"><span>$</span>
+                    <input type="number" id="fam-savings-input" min="0" step="0.01" placeholder="0" />
+                  </div>
+                </div>
+                <p id="fam-save-status" class="save-status">&nbsp;</p>
+                <button class="btn primary block" id="fam-add-btn">+ Add family expense</button>
+              </div>
+
+              <!-- Kid / Teen: their own allowance -->
+              <div class="card" id="fam-allowance-card" hidden>
+                <h3>My allowance</h3>
+                <div class="allow-row"><span>Allowance</span><strong id="fam-allow-amount">$0</strong></div>
+                <div class="allow-row"><span>Spent</span><strong id="fam-allow-spent">$0</strong></div>
+                <div class="allow-row big"><span>Remaining</span><strong id="fam-allow-remaining">$0</strong></div>
+                <button class="btn primary block" id="fam-kid-add-btn">+ Add expense</button>
+              </div>
+
+              <!-- expenses list -->
               <div class="card">
-                <h3>This month — who spent what</h3>
+                <h3 id="fam-expense-title">Family expenses this month</h3>
                 <ul id="fam-expense-list" class="expense-list"></ul>
-                <p id="fam-expense-empty" class="muted">No family spending this month.</p>
+                <p id="fam-expense-empty" class="muted">No spending this month.</p>
               </div>
             </div>
 
-            <div class="card chart-card">
+            <div class="card chart-card" id="fam-chart-card">
               <h3>Family income breakdown</h3>
               <div class="chart-wrap">
                 <canvas id="fam-pie" width="320" height="320"></canvas>
@@ -195,6 +228,13 @@
               </div>
               <ul id="fam-legend" class="legend"></ul>
             </div>
+          </div>
+
+          <!-- Owner / Parent: manage everyone's allowance -->
+          <div class="card" id="fam-manage-allowances" hidden>
+            <h3>Allowances</h3>
+            <p class="muted">Set how much each kid or teen gets. They record their own spending against it.</p>
+            <ul id="fam-allow-list" class="member-list"></ul>
           </div>
 
           <p id="fam-note" class="msg" hidden></p>
@@ -295,6 +335,50 @@
     </div>
   </div>
 
-  <script type="module" src="app.js?v=11"></script>
+  <!-- ============ FAMILY EXPENSE MODAL ============ -->
+  <div id="fam-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-panel card" role="dialog" aria-modal="true">
+      <div class="modal-head">
+        <div><h3 id="fam-modal-title">Add family expense</h3></div>
+        <button class="icon-btn" data-close aria-label="Close">×</button>
+      </div>
+      <form id="fam-form" class="day-form">
+        <div class="field-row">
+          <label for="fam-category">Category</label>
+          <select id="fam-category">
+            <option>Food &amp; Groceries</option>
+            <option>Rent &amp; Housing</option>
+            <option>Transport</option>
+            <option>Bills &amp; Utilities</option>
+            <option>Entertainment</option>
+            <option>Shopping</option>
+            <option>Health</option>
+            <option value="__custom__">Other / custom…</option>
+          </select>
+        </div>
+        <input type="text" id="fam-custom" placeholder="Custom category name" hidden />
+        <div class="field-row two">
+          <div>
+            <label for="fam-amount">Amount</label>
+            <div class="money-input"><span>$</span>
+              <input type="number" id="fam-amount" min="0" step="0.01" placeholder="0" required />
+            </div>
+          </div>
+          <div>
+            <label for="fam-date">Date</label>
+            <input type="date" id="fam-date" />
+          </div>
+        </div>
+        <div class="field-row">
+          <label for="fam-note-input">Details / note <span class="muted">(optional)</span></label>
+          <input type="text" id="fam-note-input" placeholder="e.g. Groceries for the week" maxlength="200" />
+        </div>
+        <button type="submit" class="btn primary block">Add expense</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="app.js?v=12"></script>
 </body>
 </html>

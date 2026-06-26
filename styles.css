@@ -281,6 +281,15 @@ input:focus, select:focus { border-color: var(--primary); }
 .group-sub-title { font-weight: 700; margin: 14px 0 2px; }
 .group-sub-title:first-child { margin-top: 0; }
 
+/* allowance */
+.allow-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+.allow-row:last-of-type { border-bottom: none; }
+.allow-row span { color: var(--muted); }
+.allow-row strong { font-size: 16px; }
+.allow-row.big strong { font-size: 22px; color: var(--good); }
+.allow-input { width: 130px; }
+#family-overview.kid-view .overview-grid { grid-template-columns: 1fr; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 760px) {
   .topbar { flex-wrap: wrap; gap: 12px; }

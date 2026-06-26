@@ -556,18 +556,26 @@ async function fetchMembers(groupId) {
 }
 
 async function loadFamilyOverview() {
-  familyData = { income: 0, savings: 0, expenses: [] };
+  familyData = { income: 0, savings: 0, my_role: null, my_member_id: null, members: [], expenses: [] };
   familyFnMissing = false;
   if (!activeGroup) return;
   const { data, error } = await supabase.rpc("group_overview", { gid: activeGroup.id });
-  if (error) { familyFnMissing = error.code === "PGRST202"; return; }
+  if (error) { familyFnMissing = true; return; }
   if (!data) return;
+  if (data.my_role === undefined) { familyFnMissing = true; return; } // old function → needs new migration
   familyData = {
     income: Number(data.income) || 0,
     savings: Number(data.savings) || 0,
+    my_role: data.my_role || null,
+    my_member_id: data.my_member_id || null,
+    members: (data.members || []).map((m) => ({
+      member_id: m.member_id, email: m.email, role: m.role,
+      allowance: Number(m.allowance) || 0, spent: Number(m.spent) || 0,
+    })),
     expenses: (data.expenses || []).map((e) => ({
-      category: e.category, amount: Number(e.amount),
-      spent_on: e.spent_on, note: e.note || "", email: e.email,
+      id: e.id, category: e.category, amount: Number(e.amount),
+      spent_on: e.spent_on, note: e.note || "",
+      member_id: e.member_id, email: e.email || "", role: e.role || "",
     })),
   };
 }
@@ -651,7 +659,7 @@ function renderFamily() {
   });
 }
 
-function familyExpenseRow(exp, i) {
+function familyExpenseRow(exp, i, canDelete) {
   const li = document.createElement("li");
   const main = document.createElement("div");
   main.className = "expense-main";
@@ -677,6 +685,12 @@ function familyExpenseRow(exp, i) {
   amt.className = "expense-amount";
   amt.textContent = fmt(exp.amount);
   right.append(amt);
+  if (canDelete) {
+    const del = document.createElement("button");
+    del.className = "del-btn"; del.innerHTML = "&times;"; del.title = "Delete";
+    del.addEventListener("click", () => removeFamilyExpense(exp.id));
+    right.append(del);
+  }
 
   li.append(main, right);
   return li;
@@ -690,15 +704,25 @@ function renderFamilyOverview() {
   $("fam-title").textContent = activeGroup.name;
   $("fam-note").hidden = !familyFnMissing;
   if (familyFnMissing) {
-    $("fam-note").textContent = "Run supabase/migration_family_overview.sql to see combined family totals.";
+    $("fam-note").textContent = "Run supabase/migration_family_budget.sql to enable the shared family budget.";
     $("fam-note").className = "msg error";
   }
+
+  const role = familyData.my_role;
+  const isEditor = role === "owner" || role === "parent";
+  const isKid = role === "kid" || role === "teen";
+  sec.classList.toggle("kid-view", isKid);
+  $("fam-role-tag").textContent = role
+    ? (role === "owner" ? "You're the owner" : "You're a " + roleLabel(role).toLowerCase())
+    : "";
 
   const p = monthPrefix(viewMonth);
   const monthExp = familyData.expenses.filter((e) => e.spent_on && e.spent_on.startsWith(p));
   const spent = monthExp.reduce((s, e) => s + e.amount, 0);
   const income = familyData.income;
 
+  // summary cards (hidden for kids/teens)
+  $("fam-summary").hidden = isKid;
   $("fam-stat-income").textContent = fmt(income);
   $("fam-stat-spent").textContent = fmt(spent);
   $("fam-stat-savings").textContent = fmt(familyData.savings);
@@ -707,12 +731,82 @@ function renderFamilyOverview() {
   le.textContent = fmt(left);
   le.style.color = left < 0 ? "var(--danger)" : "var(--good)";
 
+  // owner/parent: editable family money
+  $("fam-money-card").hidden = !isEditor;
+  if (isEditor) {
+    if (document.activeElement !== $("fam-income-input")) $("fam-income-input").value = income || "";
+    if (document.activeElement !== $("fam-savings-input")) $("fam-savings-input").value = familyData.savings || "";
+  }
+
+  // kid/teen: their allowance
+  $("fam-allowance-card").hidden = !isKid;
+  $("fam-chart-card").hidden = isKid;
+  if (isKid) {
+    const me = familyData.members.find((m) => m.member_id === familyData.my_member_id);
+    const allowance = me ? me.allowance : 0;
+    const usedAll = me ? me.spent : 0; // all-time spending against the allowance
+    $("fam-allow-amount").textContent = fmt(allowance);
+    $("fam-allow-spent").textContent = fmt(usedAll);
+    const rem = allowance - usedAll;
+    const remEl = $("fam-allow-remaining");
+    remEl.textContent = fmt(rem);
+    remEl.style.color = rem < 0 ? "var(--danger)" : "var(--good)";
+  }
+
+  // expenses: editors see all; kids see only their own
+  const listExp = isKid ? monthExp.filter((e) => e.member_id === familyData.my_member_id) : monthExp;
+  $("fam-expense-title").textContent = isKid ? "My expenses this month" : "Family expenses this month";
   const ul = $("fam-expense-list");
   ul.innerHTML = "";
-  $("fam-expense-empty").hidden = monthExp.length > 0;
-  monthExp.forEach((e, i) => ul.appendChild(familyExpenseRow(e, i)));
+  $("fam-expense-empty").hidden = listExp.length > 0;
+  listExp.forEach((e, i) => {
+    const canDel = isEditor || e.member_id === familyData.my_member_id;
+    ul.appendChild(familyExpenseRow(e, i, canDel));
+  });
 
-  drawDonut($("fam-pie"), $("fam-legend"), $("fam-chart-empty"), groupedExpenses(monthExp), spent, income);
+  if (!isKid) drawDonut($("fam-pie"), $("fam-legend"), $("fam-chart-empty"), groupedExpenses(monthExp), spent, income);
+
+  // owner/parent: manage kids' & teens' allowances
+  const kids = familyData.members.filter((m) => m.role === "kid" || m.role === "teen");
+  $("fam-manage-allowances").hidden = !(isEditor && kids.length > 0);
+  if (isEditor && kids.length > 0) renderAllowanceManager(kids);
+}
+
+function renderAllowanceManager(kids) {
+  const ul = $("fam-allow-list");
+  ul.innerHTML = "";
+  kids.forEach((m) => {
+    const li = document.createElement("li");
+    li.className = "member-row";
+    const av = avatarFor(m.email);
+    const avatar = document.createElement("div");
+    avatar.className = "member-avatar";
+    avatar.style.background = av.color;
+    avatar.textContent = av.ch;
+    const info = document.createElement("div");
+    info.className = "member-info";
+    const name = document.createElement("div");
+    name.className = "member-email";
+    name.textContent = m.email.split("@")[0];
+    const sub = document.createElement("div");
+    sub.className = "member-sub";
+    const remaining = m.allowance - m.spent;
+    sub.textContent = `${roleLabel(m.role)} · spent ${fmt(m.spent)} · ${fmt(remaining)} left`;
+    info.append(name, sub);
+    const actions = document.createElement("div");
+    actions.className = "member-actions";
+    const inWrap = document.createElement("div");
+    inWrap.className = "money-input";
+    const dollar = document.createElement("span"); dollar.textContent = "$";
+    const input = document.createElement("input");
+    input.type = "number"; input.min = "0"; input.step = "0.01";
+    input.className = "allow-input"; input.value = m.allowance || "";
+    input.addEventListener("change", () => setMemberAllowance(m.member_id, parseFloat(input.value) || 0));
+    inWrap.append(dollar, input);
+    actions.append(inWrap);
+    li.append(avatar, info, actions);
+    ul.appendChild(li);
+  });
 }
 
 function memberMsg(text, kind) {
@@ -772,6 +866,88 @@ async function removeMember(id, email) {
   ownedMembers = await fetchMembers(ownedGroup.id);
   renderFamily();
 }
+
+// ----- shared family budget (owner / parent) -----
+let famSaveTimer = null;
+function famMoneyInput() {
+  familyData.income = parseFloat($("fam-income-input").value) || 0;
+  familyData.savings = parseFloat($("fam-savings-input").value) || 0;
+  const p = monthPrefix(viewMonth);
+  const monthExp = familyData.expenses.filter((e) => e.spent_on && e.spent_on.startsWith(p));
+  const spent = monthExp.reduce((s, e) => s + e.amount, 0);
+  $("fam-stat-income").textContent = fmt(familyData.income);
+  $("fam-stat-savings").textContent = fmt(familyData.savings);
+  const left = familyData.income - spent;
+  const le = $("fam-stat-left"); le.textContent = fmt(left);
+  le.style.color = left < 0 ? "var(--danger)" : "var(--good)";
+  drawDonut($("fam-pie"), $("fam-legend"), $("fam-chart-empty"), groupedExpenses(monthExp), spent, familyData.income);
+  scheduleFamilySave();
+}
+function scheduleFamilySave() {
+  clearTimeout(famSaveTimer);
+  $("fam-save-status").textContent = "…";
+  famSaveTimer = setTimeout(async () => {
+    const { error } = await supabase.rpc("set_family_budget", {
+      gid: activeGroup.id, p_income: familyData.income, p_savings: familyData.savings,
+    });
+    $("fam-save-status").textContent = error ? "Couldn't save" : "Saved ✓";
+    if (!error) setTimeout(() => ($("fam-save-status").innerHTML = "&nbsp;"), 1500);
+  }, 600);
+}
+$("fam-income-input").addEventListener("input", famMoneyInput);
+$("fam-savings-input").addEventListener("input", famMoneyInput);
+
+async function setMemberAllowance(memberId, value) {
+  const { error } = await supabase.rpc("set_member_allowance", { p_member: memberId, p_allowance: value });
+  if (error) { alert("Couldn't set allowance: " + error.message); return; }
+  await loadFamilyOverview();
+  renderFamilyOverview();
+}
+
+async function removeFamilyExpense(id) {
+  if (!confirm("Delete this expense?")) return;
+  const { error } = await supabase.rpc("delete_family_expense", { p_expense: id });
+  if (error) { alert("Couldn't delete: " + error.message); return; }
+  await loadFamilyOverview();
+  renderFamilyOverview();
+}
+
+// ----- family expense modal -----
+const famModal = $("fam-modal");
+function openFamModal(title) {
+  $("fam-modal-title").textContent = title;
+  $("fam-date").value = ymd(new Date());
+  famModal.hidden = false;
+  setTimeout(() => $("fam-amount").focus(), 50);
+}
+$("fam-add-btn").addEventListener("click", () => openFamModal("Add family expense"));
+$("fam-kid-add-btn").addEventListener("click", () => openFamModal("Add expense"));
+famModal.querySelectorAll("[data-close]").forEach((el) => el.addEventListener("click", () => { famModal.hidden = true; }));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !famModal.hidden) famModal.hidden = true; });
+$("fam-category").addEventListener("change", () => {
+  const custom = $("fam-category").value === "__custom__";
+  $("fam-custom").hidden = !custom;
+  if (custom) $("fam-custom").focus();
+});
+$("fam-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const amount = parseFloat($("fam-amount").value);
+  if (!amount || amount <= 0) return;
+  const category = $("fam-category").value === "__custom__"
+    ? ($("fam-custom").value.trim() || "Other") : $("fam-category").value;
+  const date = $("fam-date").value || ymd(new Date());
+  const note = $("fam-note-input").value.trim();
+  const { error } = await supabase.rpc("add_family_expense", {
+    gid: activeGroup.id, p_category: category, p_amount: amount, p_spent_on: date, p_note: note,
+  });
+  if (error) { alert("Could not add expense: " + error.message); return; }
+  $("fam-amount").value = ""; $("fam-note-input").value = "";
+  $("fam-custom").value = ""; $("fam-custom").hidden = true;
+  $("fam-category").value = $("fam-category").options[0].value;
+  famModal.hidden = true;
+  await loadFamilyOverview();
+  renderFamilyOverview();
+});
 
 // ===================== BUDGET INPUTS =====================
 let saveTimer = null;
