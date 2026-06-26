@@ -167,6 +167,52 @@ $("prev-month").addEventListener("click", () => { viewMonth = new Date(viewMonth
 $("next-month").addEventListener("click", () => { viewMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1); renderAll(); });
 $("today-btn").addEventListener("click", () => { viewMonth = startOfMonth(new Date()); renderAll(); });
 
+// ----- Mini-calendar popover (click the month label to pick a day) -----
+const monthPopover = $("month-popover");
+const monthLabelBtn = $("month-label");
+let pickerMonth = startOfMonth(viewMonth);
+
+monthLabelBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (monthPopover.hidden) { pickerMonth = startOfMonth(viewMonth); renderPicker(); monthPopover.hidden = false; }
+  else monthPopover.hidden = true;
+});
+$("pop-prev").addEventListener("click", (e) => { e.stopPropagation(); pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1); renderPicker(); });
+$("pop-next").addEventListener("click", (e) => { e.stopPropagation(); pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1); renderPicker(); });
+document.addEventListener("click", (e) => { if (!monthPopover.hidden && !e.target.closest(".month-picker-wrap")) monthPopover.hidden = true; });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") monthPopover.hidden = true; });
+
+function renderPicker() {
+  $("pop-label").textContent = prettyMonth(pickerMonth);
+  const grid = $("pop-grid");
+  grid.innerHTML = "";
+  const y = pickerMonth.getFullYear(), m = pickerMonth.getMonth();
+  const firstWeekday = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const prefix = `${y}-${pad(m + 1)}`;
+  const has = {};
+  data.expenses.forEach((e) => { if (e.spent_on && e.spent_on.startsWith(prefix)) has[e.spent_on] = true; });
+  const todayStr = ymd(new Date());
+
+  for (let i = 0; i < firstWeekday; i++) {
+    const b = document.createElement("div"); b.className = "pop-day empty"; grid.appendChild(b);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${y}-${pad(m + 1)}-${pad(d)}`;
+    const cell = document.createElement("div");
+    cell.className = "pop-day" + (has[iso] ? " has" : "") + (iso === todayStr ? " today" : "");
+    cell.textContent = d;
+    cell.addEventListener("click", (e) => {
+      e.stopPropagation();
+      viewMonth = startOfMonth(new Date(y, m, d));
+      monthPopover.hidden = true;
+      renderAll();
+      openDay(iso);
+    });
+    grid.appendChild(cell);
+  }
+}
+
 // ===================== RENDER =====================
 function monthExpenses() {
   const p = monthPrefix(viewMonth);

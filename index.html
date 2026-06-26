@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QuickBudget — Track your money by the day</title>
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body>
   <!-- Shown if Supabase keys aren't configured yet -->
@@ -62,7 +62,21 @@
       <!-- Shared month switcher -->
       <div class="month-bar">
         <button class="nav-btn" id="prev-month" aria-label="Previous month">‹</button>
-        <h2 id="month-label">Month</h2>
+        <div class="month-picker-wrap">
+          <button id="month-label" class="month-label-btn">Month</button>
+          <div id="month-popover" class="popover" hidden>
+            <div class="popover-head">
+              <button type="button" class="nav-btn pop" id="pop-prev" aria-label="Previous">‹</button>
+              <span id="pop-label">Month</span>
+              <button type="button" class="nav-btn pop" id="pop-next" aria-label="Next">›</button>
+            </div>
+            <div class="popover-weekdays">
+              <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+            </div>
+            <div id="pop-grid" class="popover-grid"></div>
+            <p class="pop-hint muted">Pick a day to add an expense.</p>
+          </div>
+        </div>
         <button class="nav-btn" id="next-month" aria-label="Next month">›</button>
         <button class="btn ghost small" id="today-btn">Today</button>
       </div>
@@ -188,6 +202,6 @@
     </div>
   </div>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="app.js?v=4"></script>
 </body>
 </html>
