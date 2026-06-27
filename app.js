@@ -550,9 +550,19 @@ async function loadGroups() {
 }
 
 async function fetchMembers(groupId) {
-  const { data } = await supabase.from("group_members")
-    .select("id, email, role, user_id, allowance").eq("group_id", groupId).order("created_at");
+  let { data, error } = await supabase.from("group_members")
+    .select("id, email, role, user_id, allowance, nickname").eq("group_id", groupId).order("created_at");
+  if (error) {
+    // the nickname column may not exist yet → fall back so the roster still loads
+    ({ data } = await supabase.from("group_members")
+      .select("id, email, role, user_id, allowance").eq("group_id", groupId).order("created_at"));
+  }
   return data || [];
+}
+
+// display name = nickname if set, otherwise the email
+function displayName(m) {
+  return (m.nickname && m.nickname.trim()) ? m.nickname.trim() : (m.email || "");
 }
 
 async function loadFamilyOverview() {
@@ -569,13 +579,13 @@ async function loadFamilyOverview() {
     my_role: data.my_role || null,
     my_member_id: data.my_member_id || null,
     members: (data.members || []).map((m) => ({
-      member_id: m.member_id, email: m.email, role: m.role,
+      member_id: m.member_id, email: m.email, role: m.role, nickname: m.nickname || "",
       allowance: Number(m.allowance) || 0, spent: Number(m.spent) || 0,
     })),
     expenses: (data.expenses || []).map((e) => ({
       id: e.id, category: e.category, amount: Number(e.amount),
       spent_on: e.spent_on, note: e.note || "",
-      member_id: e.member_id, email: e.email || "", role: e.role || "",
+      member_id: e.member_id, email: e.email || "", nickname: e.nickname || "", role: e.role || "",
     })),
   };
 }
@@ -592,17 +602,29 @@ function memberRow(m, editable) {
 
   const info = document.createElement("div");
   info.className = "member-info";
-  const email = document.createElement("div");
-  email.className = "member-email";
+  const name = document.createElement("div");
+  name.className = "member-email";
   const isYou = m.email.toLowerCase() === user.email.toLowerCase();
-  email.textContent = m.email + (isYou ? " (you)" : "");
+  const hasNick = m.nickname && m.nickname.trim();
+  name.textContent = displayName(m) + (isYou ? " (you)" : "");
   const sub = document.createElement("div");
   sub.className = "member-sub";
-  sub.textContent = m.role === "owner" ? "Owner" : (m.user_id ? "Joined" : "Invited");
-  info.append(email, sub);
+  const status = m.role === "owner" ? "Owner" : (m.user_id ? "Joined" : "Invited");
+  sub.textContent = hasNick ? `${m.email} · ${status}` : status;
+  info.append(name, sub);
 
   const actions = document.createElement("div");
   actions.className = "member-actions";
+
+  // nickname field next to every member (editable by the owner)
+  if (editable) {
+    const nick = document.createElement("input");
+    nick.type = "text"; nick.className = "nick-input";
+    nick.placeholder = "Nickname"; nick.maxLength = 40;
+    nick.value = m.nickname || "";
+    nick.addEventListener("change", () => setMemberNickname(m.id, nick.value.trim()));
+    actions.append(nick);
+  }
 
   if (editable && m.role !== "owner") {
     // allowance input sits right next to the email for kids & teens
@@ -688,7 +710,7 @@ function familyExpenseRow(exp, i, canDelete) {
   const meta = document.createElement("div");
   meta.className = "expense-meta";
   const dateStr = exp.spent_on ? exp.spent_on.split("-").slice(1).reverse().join("/") : "";
-  const who = (exp.email || "").split("@")[0];
+  const who = (exp.nickname && exp.nickname.trim()) ? exp.nickname.trim() : (exp.email || "").split("@")[0];
   meta.textContent = [dateStr, who, exp.note].filter(Boolean).join(" · ");
   text.append(cat, meta);
   main.append(dot, text);
@@ -875,6 +897,15 @@ $("fam-savings-input").addEventListener("input", famMoneyInput);
 async function setMemberAllowance(memberId, value) {
   const { error } = await supabase.rpc("set_member_allowance", { p_member: memberId, p_allowance: value });
   if (error) { alert("Couldn't set allowance: " + error.message); return; }
+  if (ownedGroup) ownedMembers = await fetchMembers(ownedGroup.id);
+  await loadFamilyOverview();
+  renderFamily();
+}
+
+async function setMemberNickname(memberId, value) {
+  const { error } = await supabase.from("group_members")
+    .update({ nickname: value || null }).eq("id", memberId);
+  if (error) { alert("Couldn't set nickname: " + error.message); return; }
   if (ownedGroup) ownedMembers = await fetchMembers(ownedGroup.id);
   await loadFamilyOverview();
   renderFamily();
